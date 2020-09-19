@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<web-app xmlns="http://java.sun.com/xml/ns/javaee" version="2.5">
+    <servlet>
+        <servlet-name>hl7_listener</servlet-name>
+        <servlet-class>edu.gatech.chai.hl7.v2.parser.fhir.Hl7v2FhirOverHttpApp</servlet-class>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>hl7_listener</servlet-name>
+        <url-pattern>/hl7v2</url-pattern>
+    </servlet-mapping>
+</web-app>
