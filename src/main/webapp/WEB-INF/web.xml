@@ -6,6 +6,6 @@
     </servlet>
     <servlet-mapping>
         <servlet-name>hl7_listener</servlet-name>
-        <url-pattern>/hl7v2</url-pattern>
+        <url-pattern>/</url-pattern>
     </servlet-mapping>
 </web-app>
