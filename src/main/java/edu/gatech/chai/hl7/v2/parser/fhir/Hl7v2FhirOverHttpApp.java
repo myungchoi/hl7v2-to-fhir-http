@@ -39,30 +39,33 @@ public class Hl7v2FhirOverHttpApp extends HohServlet {
 		 * ReceivingApplication, which handles incoming messages 
 		 */
 		setApplication(new MyApplication());
-		hl7FhirParser = setParserType();
-		
-		ctx = FhirContext.forR4();
-//		todo: should also make the context depend on an env-var
+		setParserAndContextVersion();
 	}
 
-	public IHL7v2FHIRParser setParserType(){
+	public void setParserAndContextVersion(){
 		String HL7Version=System.getenv("HL7_MESSAGE_VERSION");
 		String FHIRVersion=System.getenv("FHIR_VERSION");
 		if(HL7Version=="v2.5.1"){
 			if(FHIRVersion=="R4"){
-				return new HL7v251FhirR4Parser();
+				ctx=FhirContext.forR4();
+				hl7FhirParser = new HL7v251FhirR4Parser();
 			}
 		}
 		else if(HL7Version=="v2.3"){
 			if(FHIRVersion=="R4"){
-				return new HL7v23FhirR4Parser();
+				ctx=FhirContext.forR4();
+				hl7FhirParser = new HL7v23FhirR4Parser();
 			}
 			if(FHIRVersion=="STU3"){
-				return new HL7v23FhirStu3Parser();
+				ctx=FhirContext.forDstu3();
+				hl7FhirParser = new HL7v23FhirStu3Parser();
 			}
 		}
-//			default
-		return new HL7v23FhirR4Parser();
+		else{
+			//			default
+			ctx=FhirContext.forR4();
+			hl7FhirParser = new HL7v23FhirR4Parser();
+		}
 	}
 
 	/**
@@ -129,12 +132,12 @@ public class Hl7v2FhirOverHttpApp extends HohServlet {
 				}
 			}
 			for (IBaseBundle bundle : bundles) {
+
 				if(saveToFile=="YES"){
 					saveJsonToFile(bundle);
 				}
 
 				if(requestUrl!=null){
-
 					// .. process the message ..
 					sendFhir(bundle,requestUrl,client);
 				}
