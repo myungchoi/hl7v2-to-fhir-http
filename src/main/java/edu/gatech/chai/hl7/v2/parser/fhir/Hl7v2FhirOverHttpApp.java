@@ -26,7 +26,7 @@ public class Hl7v2FhirOverHttpApp extends HohServlet {
 	 * 
 	 */
 	private static final long serialVersionUID = 1L;
-	private HL7v23FhirR4Parser hl7v23FhirR4Parser;
+	private IHL7v2FHIRParser hl7FhirParser;
 	private FhirContext ctx;
 	
 	/**
@@ -39,9 +39,33 @@ public class Hl7v2FhirOverHttpApp extends HohServlet {
 		 * ReceivingApplication, which handles incoming messages 
 		 */
 		setApplication(new MyApplication());
-		hl7v23FhirR4Parser = new HL7v23FhirR4Parser();
-		
-		ctx = FhirContext.forR4();
+		setParserAndContextVersion();
+	}
+
+	public void setParserAndContextVersion(){
+		String HL7Version=System.getenv("HL7_MESSAGE_VERSION");
+		String FHIRVersion=System.getenv("FHIR_VERSION");
+		if(HL7Version=="v2.5.1"){
+			if(FHIRVersion=="R4"){
+				ctx=FhirContext.forR4();
+				hl7FhirParser = new HL7v251FhirR4Parser();
+			}
+		}
+		else if(HL7Version=="v2.3"){
+			if(FHIRVersion=="R4"){
+				ctx=FhirContext.forR4();
+				hl7FhirParser = new HL7v23FhirR4Parser();
+			}
+			if(FHIRVersion=="STU3"){
+				ctx=FhirContext.forDstu3();
+				hl7FhirParser = new HL7v23FhirStu3Parser();
+			}
+		}
+		else{
+			//			default
+			ctx=FhirContext.forR4();
+			hl7FhirParser = new HL7v23FhirR4Parser();
+		}
 	}
 
 	/**
@@ -50,45 +74,25 @@ public class Hl7v2FhirOverHttpApp extends HohServlet {
 	private class MyApplication implements ReceivingApplication<Message>
 	{
 
-		private void sendFhir(Message theMessage) throws ReceivingApplicationException, HL7Exception {
-			String requestUrl = System.getenv("FHIR_PROCESS_MESSAGE_URL");
+		private void sendFhir(IBaseBundle bundle, String requestUrl, IGenericClient client) throws ReceivingApplicationException, HL7Exception {
 			if (requestUrl == null || requestUrl.isEmpty()) {
 				requestUrl = "http://localhost:8080/fhir";
 			}
-			IGenericClient client = ctx.newRestfulGenericClient(requestUrl);
 
-			String authBasic = System.getenv("AUTH_BASIC");
-			String authBearer = System.getenv("AUTH_BEARER");
-			if (authBasic != null && !authBasic.isEmpty()) {
-				String[] auth = authBasic.split(":");
-				if (auth.length == 2) {
-					client.registerInterceptor(new BasicAuthInterceptor(auth[0], auth[1]));
-				}
-			} else if (authBearer != null && !authBearer.isEmpty()) {
-				client.registerInterceptor(new BearerTokenAuthInterceptor(authBearer));
-			} else {
-				client.registerInterceptor(new BasicAuthInterceptor("client", "secret"));				
-			}
-
-			List<IBaseBundle> bundles = hl7v23FhirR4Parser.executeParser(theMessage);
 			try {
-				for (IBaseBundle bundle : bundles) {
-					String fhirJson = ctx.newJsonParser().setPrettyPrint(true).encodeResourceToString(bundle);
-					JSONObject fhirJsonObject = new JSONObject(fhirJson);
-					
-					System.out.println(fhirJsonObject.toString());
-					
 					Bundle response = client.operation().processMessage().setMessageBundle(bundle).synchronous(Bundle.class).execute();
 					if (response == null || response.isEmpty()) {
 						throw new ReceivingApplicationException("Failed to send to FHIR message");
 					}
-					
-				}
+
 			} catch (Exception e) {
 				throw new ReceivingApplicationException(e);
 			}
 		}
-		
+		public void saveJsonToFile(JSONObject bundle){
+//			System.out.println(fhirJsonObject.toString());
+//			also need it to save to a file
+		}
 		/**
 		 * processMessage is fired each time a new message 
 		 * arrives. 
@@ -100,9 +104,43 @@ public class Hl7v2FhirOverHttpApp extends HohServlet {
 		@Override
 		public Message processMessage(Message theMessage, Map<String, Object> theMetadata) throws ReceivingApplicationException, HL7Exception {
 			System.out.println("Received message:\n" + theMessage.encode());
+			List<IBaseBundle> bundles = hl7FhirParser.executeParser(theMessage);
+			String saveToFile = System.getenv("SAVE_TO_FILE");
+			String requestUrl = System.getenv("FHIR_PROCESS_MESSAGE_URL");
+			IGenericClient client=null;
+			if(requestUrl!=null){
+				client = ctx.newRestfulGenericClient(requestUrl);
+				String authBasic = System.getenv("AUTH_BASIC");
+				String authBearer = System.getenv("AUTH_BEARER");
+				if (authBasic != null && !authBasic.isEmpty()) {
+					String[] auth = authBasic.split(":");
+					if (auth.length == 2) {
+						client.registerInterceptor(new BasicAuthInterceptor(auth[0], auth[1]));
+					}
+				} else if (authBearer != null && !authBearer.isEmpty()) {
+					client.registerInterceptor(new BearerTokenAuthInterceptor(authBearer));
+				} else {
+					client.registerInterceptor(new BasicAuthInterceptor("client", "secret"));
+				}
+			}
+			for (IBaseBundle bundle : bundles) {
 
-			// .. process the message ..
-			sendFhir(theMessage);
+				String fhirJson = ctx.newJsonParser().setPrettyPrint(true).encodeResourceToString(bundle);
+				JSONObject fhirJsonObject = new JSONObject(fhirJson);
+
+				System.out.println(fhirJsonObject.toString());
+
+				if(saveToFile=="YES"){
+					saveJsonToFile(fhirJsonObject);
+				}
+
+				if(requestUrl!=null){
+					// .. process the message ..
+					sendFhir(bundle,requestUrl,client);
+				}
+			}
+
+
 			
 			/*
 			 * Now reply to the message
