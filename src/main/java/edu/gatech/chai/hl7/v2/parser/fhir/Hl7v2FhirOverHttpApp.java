@@ -80,11 +80,6 @@ public class Hl7v2FhirOverHttpApp extends HohServlet {
 			}
 
 			try {
-					String fhirJson = ctx.newJsonParser().setPrettyPrint(true).encodeResourceToString(bundle);
-					JSONObject fhirJsonObject = new JSONObject(fhirJson);
-					
-					System.out.println(fhirJsonObject.toString());
-					
 					Bundle response = client.operation().processMessage().setMessageBundle(bundle).synchronous(Bundle.class).execute();
 					if (response == null || response.isEmpty()) {
 						throw new ReceivingApplicationException("Failed to send to FHIR message");
@@ -94,10 +89,7 @@ public class Hl7v2FhirOverHttpApp extends HohServlet {
 				throw new ReceivingApplicationException(e);
 			}
 		}
-		public void saveJsonToFile(IBaseBundle bundle){
-			String fhirJson = ctx.newJsonParser().setPrettyPrint(true).encodeResourceToString(bundle);
-			JSONObject fhirJsonObject = new JSONObject(fhirJson);
-
+		public void saveJsonToFile(JSONObject bundle){
 //			System.out.println(fhirJsonObject.toString());
 //			also need it to save to a file
 		}
@@ -133,8 +125,13 @@ public class Hl7v2FhirOverHttpApp extends HohServlet {
 			}
 			for (IBaseBundle bundle : bundles) {
 
+				String fhirJson = ctx.newJsonParser().setPrettyPrint(true).encodeResourceToString(bundle);
+				JSONObject fhirJsonObject = new JSONObject(fhirJson);
+
+				System.out.println(fhirJsonObject.toString());
+
 				if(saveToFile=="YES"){
-					saveJsonToFile(bundle);
+					saveJsonToFile(fhirJsonObject);
 				}
 
 				if(requestUrl!=null){
