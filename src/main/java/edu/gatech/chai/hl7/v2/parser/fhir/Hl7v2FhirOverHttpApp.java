@@ -45,18 +45,18 @@ public class Hl7v2FhirOverHttpApp extends HohServlet {
 	public void setParserAndContextVersion(){
 		String HL7Version=System.getenv("HL7_MESSAGE_VERSION");
 		String FHIRVersion=System.getenv("FHIR_VERSION");
-		if(HL7Version=="v2.5.1"){
-			if(FHIRVersion=="R4"){
+		if("v2.5.1".equals(HL7Version)){
+			if("R4".equals(FHIRVersion)){
 				ctx=FhirContext.forR4();
 				hl7FhirParser = new HL7v251FhirR4Parser();
 			}
 		}
-		else if(HL7Version=="v2.3"){
-			if(FHIRVersion=="R4"){
+		else if("v2.3".equals(HL7Version)){
+			if("R4".equals(FHIRVersion)){
 				ctx=FhirContext.forR4();
 				hl7FhirParser = new HL7v23FhirR4Parser();
 			}
-			if(FHIRVersion=="STU3"){
+			if("STU3".equals(FHIRVersion)){
 				ctx=FhirContext.forDstu3();
 				hl7FhirParser = new HL7v23FhirStu3Parser();
 			}
