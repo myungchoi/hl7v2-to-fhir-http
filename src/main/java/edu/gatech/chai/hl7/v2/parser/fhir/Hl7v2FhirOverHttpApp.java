@@ -95,13 +95,15 @@ public class Hl7v2FhirOverHttpApp extends HohServlet {
 			}
 		}
 
-		public void saveJsonToFile(JSONObject bundle) {
+		public void saveJsonToFile(IBaseBundle bundle) {
 			String filePath = System.getenv("FILEPATH_WRITE");
 
 			try {
 				if (filePath != null && !filePath.isEmpty()) {
-					BufferedWriter writer = new BufferedWriter(new FileWriter(filePath));
-					writer.write(bundle.toString());
+					String fhirJson = ctx.newJsonParser().setPrettyPrint(true).encodeResourceToString(bundle);
+					String filename = filePath+"/"+System.currentTimeMillis()+".txt";
+					BufferedWriter writer = new BufferedWriter(new FileWriter(filename));
+					writer.write(fhirJson);
 					writer.close();
 				}
 			} catch (IOException e) {
@@ -149,8 +151,8 @@ public class Hl7v2FhirOverHttpApp extends HohServlet {
 
 				System.out.println(fhirJsonObject.toString());
 
-				if (saveToFile == "YES") {
-					saveJsonToFile(fhirJsonObject);
+				if ("YES".equals(saveToFile)) {
+					saveJsonToFile(bundle);
 				}
 
 				if (requestUrl != null) {
