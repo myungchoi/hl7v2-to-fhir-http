@@ -1,10 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0"
 	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
 	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>edu.gatech.chai.hl7</groupId>
 	<artifactId>hl7v2-to-fhir-http</artifactId>
-	<version>0.0.1</version>
+	<version>1.0.0</version>
 	<packaging>war</packaging>
 	<name>hl7v2-to-fhir-http</name>
 	<description>HL7v2 to FHIR conversion servlet</description>
@@ -31,7 +32,7 @@
 		<dependency>
 			<groupId>edu.gatech.chai.hl7</groupId>
 			<artifactId>hl7v2-to-fhir</artifactId>
-			<version>0.0.1</version>
+			<version>1.0.0</version>
 		</dependency>
 
 		<!-- https://mvnrepository.com/artifact/org.json/json -->
