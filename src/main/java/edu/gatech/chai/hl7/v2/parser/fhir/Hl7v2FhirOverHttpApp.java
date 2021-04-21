@@ -3,12 +3,15 @@ package edu.gatech.chai.hl7.v2.parser.fhir;
 import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
 
+import ca.uhn.hl7v2.model.GenericMessage;
+import ca.uhn.hl7v2.parser.PipeParser;
 import org.hl7.fhir.instance.model.api.IBaseBundle;
 import org.hl7.fhir.r4.model.Bundle;
 import org.hl7.fhir.r4.model.Bundle.BundleEntryComponent;
@@ -31,27 +34,57 @@ import ca.uhn.hl7v2.model.Message;
 import ca.uhn.hl7v2.protocol.ReceivingApplication;
 import ca.uhn.hl7v2.protocol.ReceivingApplicationException;
 
-public class Hl7v2FhirOverHttpApp extends HohServlet {
+import com.amazonaws.services.lambda.runtime.Context;
+import com.amazonaws.services.lambda.runtime.RequestHandler;
+import com.amazonaws.services.lambda.runtime.events.SQSEvent;
+import com.amazonaws.services.lambda.runtime.events.SQSEvent.SQSMessage;
+
+public class Hl7v2FhirOverHttpApp implements RequestHandler<SQSEvent, Void>{
 	/**
 	 * 
 	 */
-	private static final long serialVersionUID = 1L;
+	private final long serialVersionUID = 1L;
 	private IHL7v2FHIRParser hl7FhirParser;
 	private FhirContext ctx;
+	@Override
+    public Void handleRequest(SQSEvent event, Context context)
+    {
+    	setParserAndContextVersion();
+        for(SQSMessage msg : event.getRecords()){
+			//need to get msg into HL7 Message format
+        	//https://saravanansubramanian.com/hl72xhapiparsemessage/
+			PipeParser ourPipeParser = new PipeParser();
+			Message hl7Message = null;
+			String decoded= new String(Base64.getDecoder().decode(msg.getBody()));
+			try {
+				hl7Message = ourPipeParser.parse(decoded);
+			} catch (HL7Exception e) {
+				e.printStackTrace();
+			}
 
+			try {
+				processMessage(hl7Message,null);
+			} catch (ReceivingApplicationException e) {
+				e.printStackTrace();
+			} catch (HL7Exception e) {
+				e.printStackTrace();
+			}
+		}
+        return null;
+    }
 	/**
 	 * Initialise the servlet
 	 */
-	@Override
-	public void init(ServletConfig theConfig) throws ServletException {
+	// @Override
+	// public void init(ServletConfig theConfig) throws ServletException {
 
-		/*
-		 * Servlet should be initialized with an instance of ReceivingApplication, which
-		 * handles incoming messages
-		 */
-		setApplication(new MyApplication());
-		setParserAndContextVersion();
-	}
+		
+	// 	 * Servlet should be initialized with an instance of ReceivingApplication, which
+	// 	 * handles incoming messages
+		 
+	// 	setApplication(new MyApplication());
+	// 	setParserAndContextVersion();
+	// }
 
 	public void setParserAndContextVersion() {
 		String HL7Version = System.getenv("HL7_MESSAGE_VERSION");
@@ -79,11 +112,6 @@ public class Hl7v2FhirOverHttpApp extends HohServlet {
 		ctx.getRestfulClientFactory().setConnectTimeout(600 * 1000);
 		ctx.getRestfulClientFactory().setSocketTimeout(600 * 1000);
 	}
-
-	/**
-	 * The application does the actual processing
-	 */
-	private class MyApplication implements ReceivingApplication<Message> {
 
 		private void sendFhir(IBaseBundle bundle, String requestUrl, IGenericClient client)
 				throws ReceivingApplicationException, HL7Exception {
@@ -142,7 +170,6 @@ public class Hl7v2FhirOverHttpApp extends HohServlet {
 		 * @param theMetadata A map containing additional information about the message,
 		 *                    where it came from, etc.
 		 */
-		@Override
 		public Message processMessage(Message theMessage, Map<String, Object> theMetadata)
 				throws ReceivingApplicationException, HL7Exception {
 			System.out.println("Received message:\n" + theMessage.encode());
@@ -234,6 +261,4 @@ public class Hl7v2FhirOverHttpApp extends HohServlet {
 		public boolean canProcess(Message theMessage) {
 			return true;
 		}
-
-	}
 }
