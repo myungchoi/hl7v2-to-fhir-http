@@ -59,17 +59,22 @@ public class Hl7v2FhirOverHttpApp implements RequestHandler<SQSEvent, Void>{
 			try {
 				hl7Message = ourPipeParser.parse(decoded);
 			} catch (HL7Exception e) {
+				System.out.println("hit HL7Exception1");
 				e.printStackTrace();
 			}
 
 			try {
 				processMessage(hl7Message,null);
+				System.out.println("made it out of processMessage successfully");
 			} catch (ReceivingApplicationException e) {
+				System.out.println("hit ReceivingApplicationException");
 				e.printStackTrace();
 			} catch (HL7Exception e) {
+				System.out.println("hit HL7Exception2");
 				e.printStackTrace();
 			}
 		}
+        System.out.println("end of handleRequest");
         return null;
     }
 	/**
@@ -170,8 +175,7 @@ public class Hl7v2FhirOverHttpApp implements RequestHandler<SQSEvent, Void>{
 		 * @param theMetadata A map containing additional information about the message,
 		 *                    where it came from, etc.
 		 */
-		public Message processMessage(Message theMessage, Map<String, Object> theMetadata)
-				throws ReceivingApplicationException, HL7Exception {
+		public Message processMessage(Message theMessage, Map<String, Object> theMetadata) throws HL7Exception, ReceivingApplicationException {
 			System.out.println("Received message:\n" + theMessage.encode());
 			List<IBaseBundle> bundles = hl7FhirParser.executeParser(theMessage);
 			String saveToFile = System.getenv("SAVE_TO_FILE");
@@ -192,6 +196,7 @@ public class Hl7v2FhirOverHttpApp implements RequestHandler<SQSEvent, Void>{
 					client.registerInterceptor(new BasicAuthInterceptor("client", "secret"));
 				}
 			}
+			System.out.println("bundles are: \n"+bundles.toString());
 			for (IBaseBundle bundle : bundles) {
 
 				String fhirJson = ctx.newJsonParser().setPrettyPrint(true).encodeResourceToString(bundle);
@@ -208,6 +213,7 @@ public class Hl7v2FhirOverHttpApp implements RequestHandler<SQSEvent, Void>{
 
 				// change it to transaction bundle.
 				bundle = makeTransactionFromMessage((Bundle)bundle);
+				System.out.println("would post data here");
 				if (requestUrl != null) {
 					// .. process the message ..
 					sendFhir(bundle, requestUrl, client);
