@@ -131,6 +131,7 @@ public class Hl7v2FhirOverHttpApp implements RequestHandler<SQSEvent, Void>{
 //				Bundle response = client.operation().processMessage().setMessageBundle(bundle).synchronous(Bundle.class)
 //						.execute();
 				Bundle response = client.transaction().withBundle((Bundle)bundle).execute();
+				System.out.println("the response is: \n"+response.toString());
 				if (response == null || response.isEmpty()) {
 					throw new ReceivingApplicationException("Failed to send to FHIR message");
 				}
@@ -222,6 +223,7 @@ public class Hl7v2FhirOverHttpApp implements RequestHandler<SQSEvent, Void>{
 				bundle = makeTransactionFromMessage((Bundle)bundle);
 				System.out.println("would post data here");
 				if (requestUrl != null) {
+					System.out.println("transaction bundle: "+bundle.toString());
 					// .. process the message ..
 					sendFhir(bundle, requestUrl, client);
 				}
