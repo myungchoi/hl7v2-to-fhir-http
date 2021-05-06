@@ -16,17 +16,9 @@ import ca.uhn.hl7v2.model.v251.message.ORU_R01;
 import ca.uhn.hl7v2.parser.PipeParser;
 import org.hl7.fhir.instance.model.api.IBaseBundle;
 import org.hl7.fhir.r4.model.Bundle;
-import org.hl7.fhir.r4.model.Bundle.BundleEntryComponent;
-import org.hl7.fhir.r4.model.Bundle.BundleEntryRequestComponent;
-import org.hl7.fhir.r4.model.Bundle.BundleType;
-import org.hl7.fhir.r4.model.Bundle.HTTPVerb;
-import org.hl7.fhir.r4.model.IdType;
-import org.hl7.fhir.r4.model.Resource;
-import org.hl7.fhir.r4.model.ResourceType;
 import org.json.JSONObject;
 
 import ca.uhn.fhir.context.FhirContext;
-import ca.uhn.fhir.model.api.IResource;
 import ca.uhn.fhir.rest.client.api.IGenericClient;
 import ca.uhn.fhir.rest.client.interceptor.BasicAuthInterceptor;
 import ca.uhn.fhir.rest.client.interceptor.BearerTokenAuthInterceptor;
@@ -141,26 +133,13 @@ public class Hl7v2FhirOverHttpApp implements RequestHandler<SQSEvent, Void>{
 			}
 		}
 
-		private Bundle makeTransactionFromMessage (Bundle bundle) {
-			// Write transaction
-			Bundle transactionBundle = (Bundle) bundle;
-			transactionBundle.setType(BundleType.TRANSACTION);
-			List<BundleEntryComponent> entries = transactionBundle.getEntry();
-			for (BundleEntryComponent entry : entries) {
-				Resource resource = entry.getResource();
-				ResourceType resourceType = resource.getResourceType();
-				String resourceTypeString = resourceType.name();
-				BundleEntryRequestComponent entryRequest = entry.getRequest();
-				entryRequest.setMethod(HTTPVerb.POST);
-				entryRequest.setUrl(resourceTypeString);
-			}
-			return transactionBundle;
-		}
-		
-		public void saveJsonToFile(IBaseBundle bundle, String filename) {
+		public void saveJsonToFile(IBaseBundle bundle) {
+			String filePath = System.getenv("FILEPATH_WRITE");
+
 			try {
-				if (filename != null && !filename.isEmpty()) {
+				if (filePath != null && !filePath.isEmpty()) {
 					String fhirJson = ctx.newJsonParser().setPrettyPrint(true).encodeResourceToString(bundle);
+					String filename = filePath+"/"+System.currentTimeMillis()+".txt";
 					BufferedWriter writer = new BufferedWriter(new FileWriter(filename));
 					writer.write(fhirJson);
 					writer.close();
@@ -212,11 +191,8 @@ public class Hl7v2FhirOverHttpApp implements RequestHandler<SQSEvent, Void>{
 
 				System.out.println(fhirJsonObject.toString());
 
-				String filePath = System.getenv("FILEPATH_WRITE");
-				String fileUnique = String.valueOf(System.currentTimeMillis());
-				if ("YES".equals(saveToFile)) {					
-					String filename = filePath + "/" + fileUnique + "_message.txt";
-					saveJsonToFile(bundle, filename);
+				if ("YES".equals(saveToFile)) {
+					saveJsonToFile(bundle);
 				}
 
 				// change it to transaction bundle.
@@ -226,11 +202,6 @@ public class Hl7v2FhirOverHttpApp implements RequestHandler<SQSEvent, Void>{
 					System.out.println("transaction bundle: "+bundle.toString());
 					// .. process the message ..
 					sendFhir(bundle, requestUrl, client);
-				}
-				
-				if ("YES".equals(saveToFile)) {
-					String filename = filePath + "/" + fileUnique + "_transaction.txt";
-					saveJsonToFile(bundle, filename);
 				}
 			}
 
