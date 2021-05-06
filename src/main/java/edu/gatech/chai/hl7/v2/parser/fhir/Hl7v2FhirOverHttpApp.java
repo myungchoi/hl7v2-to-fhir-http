@@ -3,17 +3,12 @@ package edu.gatech.chai.hl7.v2.parser.fhir;
 import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
 
-import ca.uhn.fhir.rest.client.api.ServerValidationModeEnum;
-import ca.uhn.hl7v2.model.GenericMessage;
-import ca.uhn.hl7v2.model.v251.message.ORU_R01;
-import ca.uhn.hl7v2.parser.PipeParser;
 import org.hl7.fhir.instance.model.api.IBaseBundle;
 import org.hl7.fhir.r4.model.Bundle;
 import org.hl7.fhir.r4.model.Bundle.BundleEntryComponent;
@@ -36,63 +31,27 @@ import ca.uhn.hl7v2.model.Message;
 import ca.uhn.hl7v2.protocol.ReceivingApplication;
 import ca.uhn.hl7v2.protocol.ReceivingApplicationException;
 
-import com.amazonaws.services.lambda.runtime.Context;
-import com.amazonaws.services.lambda.runtime.RequestHandler;
-import com.amazonaws.services.lambda.runtime.events.SQSEvent;
-import com.amazonaws.services.lambda.runtime.events.SQSEvent.SQSMessage;
-
-public class Hl7v2FhirOverHttpApp implements RequestHandler<SQSEvent, Void>{
+public class Hl7v2FhirOverHttpApp extends HohServlet {
 	/**
 	 * 
 	 */
-	private final long serialVersionUID = 1L;
+	private static final long serialVersionUID = 1L;
 	private IHL7v2FHIRParser hl7FhirParser;
 	private FhirContext ctx;
-	@Override
-    public Void handleRequest(SQSEvent event, Context context){
-    	setParserAndContextVersion();
-        for(SQSMessage msg : event.getRecords()){
-			//need to get msg into HL7 Message format
-        	//https://saravanansubramanian.com/hl72xhapiparsemessage/
-			PipeParser ourPipeParser = new PipeParser();
-			Message hl7Message = null;
-			String decoded= new String(Base64.getDecoder().decode(msg.getBody()));
-			decoded=decoded.replace("\r\n","\r");
-			decoded=decoded.replace("\n","\r");
-			try {
-				hl7Message = ourPipeParser.parse(decoded);
-			} catch (HL7Exception e) {
-				System.out.println("hit HL7Exception1");
-				e.printStackTrace();
-			}
 
-			try {
-				processMessage(hl7Message,null);
-				System.out.println("made it out of processMessage successfully");
-			} catch (ReceivingApplicationException e) {
-				System.out.println("hit ReceivingApplicationException");
-				e.printStackTrace();
-			} catch (HL7Exception e) {
-				System.out.println("hit HL7Exception2");
-				e.printStackTrace();
-			}
-		}
-        System.out.println("end of handleRequest");
-        return null;
-    }
 	/**
 	 * Initialise the servlet
 	 */
-	// @Override
-	// public void init(ServletConfig theConfig) throws ServletException {
+	@Override
+	public void init(ServletConfig theConfig) throws ServletException {
 
-		
-	// 	 * Servlet should be initialized with an instance of ReceivingApplication, which
-	// 	 * handles incoming messages
-		 
-	// 	setApplication(new MyApplication());
-	// 	setParserAndContextVersion();
-	// }
+		/*
+		 * Servlet should be initialized with an instance of ReceivingApplication, which
+		 * handles incoming messages
+		 */
+		setApplication(new MyApplication());
+		setParserAndContextVersion();
+	}
 
 	public void setParserAndContextVersion() {
 		String HL7Version = System.getenv("HL7_MESSAGE_VERSION");
@@ -116,10 +75,15 @@ public class Hl7v2FhirOverHttpApp implements RequestHandler<SQSEvent, Void>{
 			ctx = FhirContext.forR4();
 			hl7FhirParser = new HL7v23FhirR4Parser();
 		}
-		ctx.getRestfulClientFactory().setServerValidationMode(ServerValidationModeEnum.NEVER);
+
 		ctx.getRestfulClientFactory().setConnectTimeout(600 * 1000);
 		ctx.getRestfulClientFactory().setSocketTimeout(600 * 1000);
 	}
+
+	/**
+	 * The application does the actual processing
+	 */
+	private class MyApplication implements ReceivingApplication<Message> {
 
 		private void sendFhir(IBaseBundle bundle, String requestUrl, IGenericClient client)
 				throws ReceivingApplicationException, HL7Exception {
@@ -128,10 +92,8 @@ public class Hl7v2FhirOverHttpApp implements RequestHandler<SQSEvent, Void>{
 			}
 
 			try {
-//				Bundle response = client.operation().processMessage().setMessageBundle(bundle).synchronous(Bundle.class)
-//						.execute();
-				Bundle response = client.transaction().withBundle((Bundle)bundle).execute();
-				System.out.println("the response is: \n"+response.toString());
+				Bundle response = client.operation().processMessage().setMessageBundle(bundle).synchronous(Bundle.class)
+						.execute();
 				if (response == null || response.isEmpty()) {
 					throw new ReceivingApplicationException("Failed to send to FHIR message");
 				}
@@ -180,11 +142,10 @@ public class Hl7v2FhirOverHttpApp implements RequestHandler<SQSEvent, Void>{
 		 * @param theMetadata A map containing additional information about the message,
 		 *                    where it came from, etc.
 		 */
-		public Message processMessage(Message theMessage, Map<String, Object> theMetadata) throws HL7Exception, ReceivingApplicationException {
+		@Override
+		public Message processMessage(Message theMessage, Map<String, Object> theMetadata)
+				throws ReceivingApplicationException, HL7Exception {
 			System.out.println("Received message:\n" + theMessage.encode());
-			ORU_R01 oruR01Message = (ca.uhn.hl7v2.model.v251.message.ORU_R01) theMessage;
-			int numberOfResponses = oruR01Message.getPATIENT_RESULTReps();
-			System.out.println("number of responses is: "+numberOfResponses);
 			List<IBaseBundle> bundles = hl7FhirParser.executeParser(theMessage);
 			String saveToFile = System.getenv("SAVE_TO_FILE");
 			String requestUrl = System.getenv("FHIR_PROCESS_MESSAGE_URL");
@@ -204,7 +165,6 @@ public class Hl7v2FhirOverHttpApp implements RequestHandler<SQSEvent, Void>{
 					client.registerInterceptor(new BasicAuthInterceptor("client", "secret"));
 				}
 			}
-			System.out.println("bundles are: \n"+bundles.toString());
 			for (IBaseBundle bundle : bundles) {
 
 				String fhirJson = ctx.newJsonParser().setPrettyPrint(true).encodeResourceToString(bundle);
@@ -221,9 +181,7 @@ public class Hl7v2FhirOverHttpApp implements RequestHandler<SQSEvent, Void>{
 
 				// change it to transaction bundle.
 				bundle = makeTransactionFromMessage((Bundle)bundle);
-				System.out.println("would post data here");
 				if (requestUrl != null) {
-					System.out.println("transaction bundle: "+bundle.toString());
 					// .. process the message ..
 					sendFhir(bundle, requestUrl, client);
 				}
@@ -276,4 +234,6 @@ public class Hl7v2FhirOverHttpApp implements RequestHandler<SQSEvent, Void>{
 		public boolean canProcess(Message theMessage) {
 			return true;
 		}
+
+	}
 }

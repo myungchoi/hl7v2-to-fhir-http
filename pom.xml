@@ -6,7 +6,7 @@
 	<groupId>edu.gatech.chai.hl7</groupId>
 	<artifactId>hl7v2-to-fhir-http</artifactId>
 	<version>1.0.0</version>
-	<packaging>jar</packaging>
+	<packaging>war</packaging>
 	<name>hl7v2-to-fhir-http</name>
 	<description>HL7v2 to FHIR conversion servlet</description>
 	<url>http://maven.apache.org</url>
@@ -18,16 +18,6 @@
 	</properties>
 
 	<dependencies>
-		<dependency>
-			<groupId>com.amazonaws</groupId>
-			<artifactId>aws-lambda-java-core</artifactId>
-			<version>1.2.0</version>
-		</dependency>
-		<dependency>
-			<groupId>com.amazonaws</groupId>
-			<artifactId>aws-lambda-java-events</artifactId>
-			<version>3.7.0</version>
-		</dependency>
 		<dependency>
 			<groupId>log4j</groupId>
 			<artifactId>log4j</artifactId>
@@ -130,21 +120,12 @@
 				</configuration>
 			</plugin>
 
+			<!-- The configuration here tells the WAR plugin to include the FHIR Tester 
+				overlay. You can omit it if you are not using that feature. -->
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-shade-plugin</artifactId>
-				<version>3.2.2</version>
-				<configuration>
-					<createDependencyReducedPom>false</createDependencyReducedPom>
-				</configuration>
-				<executions>
-					<execution>
-						<phase>package</phase>
-						<goals>
-							<goal>shade</goal>
-						</goals>
-					</execution>
-				</executions>
+				<artifactId>maven-war-plugin</artifactId>
+				<version>3.2.3</version>
 			</plugin>
 
 			<plugin>
